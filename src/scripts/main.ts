@@ -1,5 +1,6 @@
 import { CONSTELLATION } from "../data/constellation";
 import { Engine } from "../lib/engine";
+import { EventLayer } from "../lib/events";
 import { clamp01 } from "../lib/mapping";
 import { blendTimbres } from "../lib/timbre";
 import { DEFAULT_FOCUS, gaussianWeights, type Point } from "../lib/weighting";
@@ -28,6 +29,7 @@ export function start(): void {
 
   const marks = [...field.querySelectorAll<HTMLElement>("[data-prompt]")];
   const engine = new Engine();
+  const events = new EventLayer(engine);
 
   let position: Point = { x: 0.5, y: 0.5 };
   let started = false;
@@ -51,7 +53,9 @@ export function start(): void {
   function moveTo(next: Point): void {
     position = { x: clamp01(next.x), y: clamp01(next.y) };
     const weights = gaussianWeights(position, POSITIONS, DEFAULT_FOCUS);
-    engine.setTimbre(blendTimbres(TIMBRES, weights));
+    const timbre = blendTimbres(TIMBRES, weights);
+    engine.setTimbre(timbre);
+    events.setTimbre(timbre);
     render(weights);
   }
 
@@ -66,6 +70,7 @@ export function start(): void {
     // running, which is the difference between "we asked" and "it sounds".
     document.body.dataset.audio = engine.running ? "running" : "blocked";
     moveTo(position);
+    events.start();
   }
 
   function positionFromPointer(event: PointerEvent): Point {
