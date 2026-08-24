@@ -38,6 +38,15 @@ export function start(): void {
   const readout = document.querySelector<HTMLElement>(
     '[data-testid="voicing-value"]',
   );
+  const handsButton = document.querySelector<HTMLButtonElement>(
+    '[data-testid="hands"]',
+  );
+  const handsReadout = document.querySelector<HTMLElement>(
+    '[data-testid="hands-value"]',
+  );
+  const mirror = document.querySelector<HTMLVideoElement>(
+    '[data-testid="mirror"]',
+  );
   if (!field || !cursor) return;
 
   const marks = [...field.querySelectorAll<HTMLElement>("[data-prompt]")];
@@ -49,6 +58,7 @@ export function start(): void {
   let voicing: Voicing = "authored";
   let projected: Timbre[] | null = null;
   let loading = false;
+  let tracker: import("../lib/hands").HandTracker | null = null;
 
   function timbres(): readonly Timbre[] {
     return voicing === "projected" && projected ? projected : AUTHORED;
@@ -174,6 +184,55 @@ export function start(): void {
 
   toggle?.addEventListener("click", () => {
     void setVoicing(voicing === "authored" ? "projected" : "authored");
+  });
+
+  /**
+   * Hand tracking, offered rather than required.
+   *
+   * Dynamically imported for the same reason as the embedder: the model and
+   * its wasm runtime are tens of megabytes, and none of it may load before a
+   * stranger can play. Pointer and keyboard keep working throughout, including
+   * on every failure path --- a refused camera must cost nothing.
+   */
+  const HAND_LABELS: Record<string, string> = {
+    idle: "off",
+    loading: "starting",
+    tracking: "on",
+    denied: "no camera",
+    failed: "unavailable",
+  };
+
+  handsButton?.addEventListener("click", () => {
+    void (async () => {
+      if (!mirror) return;
+
+      if (tracker?.tracking) {
+        tracker.stop();
+        handsButton.setAttribute("aria-pressed", "false");
+        return;
+      }
+
+      handsButton.setAttribute("aria-pressed", "true");
+      tracker ??= new (await import("../lib/hands")).HandTracker({
+        video: mirror,
+        // The hand drives the same travelling point the pointer does, so
+        // everything downstream is unchanged and the two inputs are
+        // interchangeable rather than parallel code paths.
+        onPosition: (point) => {
+          void begin();
+          moveTo(point);
+        },
+        onState: (state) => {
+          document.body.dataset.hands = state;
+          if (handsReadout) handsReadout.textContent = HAND_LABELS[state] ?? state;
+          if (state !== "tracking" && state !== "loading") {
+            handsButton.setAttribute("aria-pressed", "false");
+          }
+        },
+      });
+
+      await tracker.start();
+    })();
   });
 
   window.addEventListener("keydown", (event) => {

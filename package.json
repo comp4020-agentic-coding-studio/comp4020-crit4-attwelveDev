@@ -26,6 +26,7 @@
   "packageManager": "pnpm@11.9.0",
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
+    "@mediapipe/tasks-vision": "^1.0.1",
     "astro": "^7.1.6"
   }
 }

@@ -50,17 +50,40 @@ import "../styles/global.css";
         <div class="cursor" data-testid="cursor" aria-hidden="true"></div>
       </div>
 
-      <button
-        class="voicing"
-        type="button"
-        data-testid="voicing"
-        aria-pressed="false"
-      >
-        <span class="voicing-label">voiced by</span>
-        <span class="voicing-value" data-testid="voicing-value" aria-live="polite"
-          >authored</span
+      <div class="controls">
+        <button
+          class="control"
+          type="button"
+          data-testid="hands"
+          aria-pressed="false"
         >
-      </button>
+          <span class="control-label">hands</span>
+          <span class="control-value" data-testid="hands-value" aria-live="polite"
+            >off</span
+          >
+        </button>
+
+        <button
+          class="control"
+          type="button"
+          data-testid="voicing"
+          aria-pressed="false"
+        >
+          <span class="control-label">voiced by</span>
+          <span
+            class="control-value"
+            data-testid="voicing-value"
+            aria-live="polite">authored</span
+          >
+        </button>
+      </div>
+
+      <video
+        class="mirror"
+        data-testid="mirror"
+        playsinline
+        muted
+        aria-hidden="true"></video>
     </main>
 
     <script>

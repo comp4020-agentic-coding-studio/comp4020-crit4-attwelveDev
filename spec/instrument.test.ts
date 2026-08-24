@@ -55,9 +55,22 @@ describe("the browser is the instrument, not a tape deck", () => {
     ).toEqual([]);
   });
 
-  it("has no <audio> or <video> playback elements", () => {
+  // Narrowed once, deliberately, when the camera input was added. The spec
+  // line is that sound is *made live in the page, not played back*, and this
+  // originally banned every <audio> and <video> element as a proxy for that.
+  // A muted <video> with no media source, fed by getUserMedia, plays nothing
+  // back --- it is a live camera view of the player's own hand. What still has
+  // to be forbidden is an element that *has* something to play: any <audio> at
+  // all, and any <video> carrying a src or a <source>.
+  it("has no element that plays recorded media", () => {
     for (const doc of pages) {
-      expect(doc.querySelectorAll("audio, video").length).toBe(0);
+      expect(doc.querySelectorAll("audio").length).toBe(0);
+      for (const video of doc.querySelectorAll("video")) {
+        expect(
+          video.hasAttribute("src") || video.querySelector("source") !== null,
+          "a <video> with a media source is playback, not live capture",
+        ).toBe(false);
+      }
     }
   });
 

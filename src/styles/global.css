@@ -135,10 +135,39 @@ main {
 /* Bottom right, opposite the title and the course link, so the three pieces of
    chrome sit in different corners and none of them lands under the cursor at
    a position a player is likely to want. */
-.voicing {
+.controls {
   position: absolute;
   inset: auto var(--edge) var(--edge) auto;
   z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* A small mirrored preview, so a player can see where their hand is relative
+   to the frame. Dim and out of the way: it is a sighting aid, not content. */
+.mirror {
+  position: absolute;
+  inset: var(--edge) var(--edge) auto auto;
+  z-index: 2;
+  width: clamp(7rem, 14vw, 11rem);
+  border: 1px solid color-mix(in srgb, var(--ink-dim) 35%, transparent);
+  border-radius: 0.5rem;
+
+  /* The camera image is mirrored relative to the player, and an unmirrored
+     preview makes every correction go the wrong way. */
+  scale: -1 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms ease;
+}
+
+body[data-hands="tracking"] .mirror {
+  opacity: 0.42;
+}
+
+.control {
   display: flex;
   gap: 0.5em;
   align-items: baseline;
@@ -157,23 +186,23 @@ main {
     color 200ms ease;
 }
 
-.voicing:hover,
-.voicing:focus-visible {
+.control:hover,
+.control:focus-visible {
   border-color: color-mix(in srgb, var(--glow) 60%, transparent);
   color: var(--ink);
 }
 
-.voicing:focus-visible {
+.control:focus-visible {
   outline: 2px solid var(--glow);
   outline-offset: 3px;
 }
 
-.voicing[aria-pressed="true"] {
+.control[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--glow) 70%, transparent);
   color: var(--ink);
 }
 
-.voicing-value {
+.control-value {
   /* Fixed width so the label doesn't jump as the download counts up. */
   min-width: 9ch;
   color: var(--glow);
