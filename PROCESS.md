@@ -1,85 +1,101 @@
 # Process overview
 
-<!-- TEMPLATE: this file is a shape to fill in, not a form. Replace everything
-     in it with your own overview, and delete this comment — `pnpm
-     check:evidence` will remind you if it's still here. -->
+<!-- DRAFT SCAFFOLD — edit before shipping.
 
-A reading-guide to how the work came together --- a map to your process, not an
-essay about it. Markers read this file and follow its citations; they don't
-trawl the repo for evidence you didn't point at, so if a moment mattered, cite
-it.
-
-This file is the shape; the course site's
-[assessment page](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#what-you-submit)
-is the requirement, and its
-[word counts](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#word-counts)
-cover every deliverable.
+     The citations, checks and technical facts below are accurate. What needs
+     your hand is the judgement: each moment should say why *you* made the call
+     you made. Where a bracketed note appears, that's a gap only you can fill.
+     Cut anything that doesn't match how the week actually felt. -->
 
 ## What I built
 
-One paragraph: the thing, and the idea behind it.
+**Field** is a browser instrument built as a probe for my honours thesis, in
+which performers steer AI-generated music by positioning text-prompt spheres
+relative to a centre, with distance setting each prompt's influence. Eight
+authored prompts sit as fixed landmarks in a two-dimensional field; the player
+moves a single travelling point, and hears a Gaussian-weighted blend of whatever
+is near. MagentaRT is local-only and cannot ship to Pages, so procedural Web
+Audio synthesis stands in for the model — which is the point rather than a
+compromise. With the generator removed the response is instant and
+attributable, so the *interaction* can be interrogated at a speed the real
+system can't offer.
+
+The prototype deliberately inverts my thesis's metaphor: instead of moving
+eight prompts, the player moves themselves through a fixed terrain. That cuts
+the control load from eight objects to one, which matters because the performer
+this is ultimately for already has both hands on another instrument.
 
 ## The moments that mattered
 
-Three or four for an assignment; fewer is fine for a weekly prototype. Keep the
-list short so each moment has room to do all four jobs:
+### The spec test wrote a line of the architecture
 
-1. **what happened** --- the problem, or the thing that went wrong
-2. **what you did instead of the obvious thing** --- the call you made, and why
-   it beat the obvious one
-3. **how you knew it was right** --- the check you ran, the viewport you looked
-   at, what you read before accepting the diff
-4. **the citation** --- a commit or commit range, a `CLAUDE.md` change, a check
-   that went from red to green, a prompt paired with the commit it produced
+Before any prototype existed I turned the week's published spec into tests
+([`ff2b86f`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-attwelveDev/commit/ff2b86f)),
+including an assertion that no pre-recorded audio ships — the spec says sound
+must be made live in the page, not played back. Those tests started red, which
+was the intent.
 
-Jobs 2 and 3 are the ones the repo can't tell a reader on its own, so they're
-where the marks are. The strongest moments are the ones where a correction
-landed in the **harness** --- the standards and checks your work has to satisfy
---- rather than in a retry: a rule added to `CLAUDE.md`, a check wired up, an
-attempt thrown away. Retrying until it passes is the routine case, and changing
-what the work runs against is the skilled one.
+The payoff came later and not where I expected. Building the pad's reverb, the
+obvious move is to load an impulse-response file. That test forbids it, so the
+impulse is generated at runtime from decaying noise instead
+([`6f6fb51`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-attwelveDev/commit/6f6fb51)).
+A constraint I wrote before I knew what I was building chose an implementation
+for me. The spec tests went red-to-green across
+[`ff2b86f...2ff210b`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-attwelveDev/compare/ff2b86f...2ff210b).
 
-Cite each moment as a link whose text is the commit hash or range and whose
-target is this repo's commit or compare URL, so a reader clicks straight to the
-evidence:
+<!-- [Your line here: did writing tests before the prototype change how you
+     approached the build, or did it feel like overhead until this moment?] -->
 
-- one commit: [`a1b2c3d`](https://github.com/YOUR-ORG/YOUR-REPO/commit/a1b2c3d)
-- a range:
-  [`a1b2c3d...e4f5a6b`](https://github.com/YOUR-ORG/YOUR-REPO/compare/a1b2c3d...e4f5a6b)
+### A drone that no setting could change
 
-To pair a prompt with the commit it produced, quote the prompt (curated, not a
-full transcript) next to the citation:
+Playing the first complete build, I heard an ominous bass buzz under every
+prompt, masking whatever each was supposed to sound like. The obvious response
+is to retune — drop the drive, move the filter.
 
-> the prompt, verbatim
+The real fault was structural. The only spectral control in the graph was a
+lowpass, which by definition removes highs; nothing anywhere removed lows. The
+fundamental and its bottom harmonics were therefore present *identically* in
+every prompt regardless of what any timbre axis did. The bass was the one
+quality that mathematically could not vary. Two further causes compounded it: a
+waveshaper on every voice at all times, which imposes its own harmonic
+signature on whatever it is fed and so collapsed the prompts toward each other,
+and five sawtooth partials capped at 233 Hz, where a saw already contains every
+harmonic and leaves the axes nothing to control
+([`5cdfe12`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-attwelveDev/commit/5cdfe12)).
 
-Screenshots are welcome where one carries the verification better than a
-sentence does. Commit the file to this repo and link it with a **relative**
-path, which is what makes it render on GitHub: `![alt text](docs/before.png)`.
-Images don't count towards the word count and don't replace the citation.
+The correction went into the harness rather than the fix: three rules in
+`CLAUDE.md` about spectral design, the sharpest being that *if no part of the
+graph can remove a band, that band is a constant*.
 
-### A worked moment, for shape
+### Measuring what I couldn't hear — and the limits of that
 
-Delete this section along with the rest of the boilerplate --- it's here to show
-the four jobs in one paragraph, not to be imitated in content.
+The week's brief says an agent can build a synth but can't hear the result. I
+leaned on measurement to close part of that gap: an `AnalyserNode` tapped onto
+the output, sampling spectral balance across six prompts, and later sampling
+RMS over time to get a dynamic-contrast figure.
 
-> The date formatter kept coming back with `toLocaleDateString()` and no locale
-> argument, so the same build rendered differently on my machine and in CI. I'd
-> already re-prompted it twice, which fixed the line but not the habit, so the
-> third time I put the rule in `CLAUDE.md` instead
-> ([`3f9ac21`](https://github.com/YOUR-ORG/YOUR-REPO/commit/3f9ac21)) and added
-> a spec test that fails on a bare `toLocaleDateString`. That's what told me it
-> had actually taken: the test went red against the old code and green against
-> the new, and the next two features it wrote passed it without prompting
-> ([`3f9ac21...b7e0d14`](https://github.com/YOUR-ORG/YOUR-REPO/compare/3f9ac21...b7e0d14)).
+That measurement caught something listening hadn't isolated. Contrast sat at
+1.3–1.6×, meaning the signal barely moved — events were sitting *inside* the
+pad rather than above it. The cause was my own limiter: at −10 dB with a 12:1
+ratio and a 3 ms attack it was catching every pluck transient and crushing it
+back to the drone's level. I had built the thing that destroyed the contrast I
+needed
+([`5522efa`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-attwelveDev/commit/5522efa)).
+Contrast after the fix: 3.5–5.0×.
 
-## Before you ship
+But the numbers never initiated a fix. Both audio problems were found by ear
+first, and measurement only told me *why*. A spectrum plot cannot tell you
+something is unpleasant to sit with.
 
-`pnpm check:evidence` verifies your citations resolve to real commits, that a
-reflection entry the marker reads is in `reflections/`, and that your
-`CLAUDE.md` is there --- before a marker ever opens the file. It checks that
-your map is traceable, not that it is good: the marker judges whether your
-small, deliberately chosen set of moments shows real judgement and reflection. A
-green check is not a substitute for that curation.
+<!-- [Your line here: how did you decide when it sounded right? What were you
+     listening for that a number couldn't stand in for?] -->
 
-Images aren't checked: whether one renders is visible the moment you look. Open
-this file on GitHub and look at it before you ship.
+## Where to look
+
+- Harness carried forward from Assignment 1, keeping the general rules and
+  dropping what was specific to that prototype:
+  [`ad47a73`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-attwelveDev/commit/ad47a73)
+- The build, plan through instrument:
+  [`3c19be6...5522efa`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-attwelveDev/compare/3c19be6...5522efa)
+- `PLAN.md` records what was deliberately left out and why — hand tracking, a
+  real generative model, trajectory-as-score.
