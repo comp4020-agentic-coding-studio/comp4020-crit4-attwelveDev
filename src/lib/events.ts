@@ -1,6 +1,6 @@
+import { ROOT_RANGE, type Engine } from "./engine";
 import { mapExp, mapLinear } from "./mapping";
 import { neutralTimbre, type Timbre } from "./timbre";
-import type { Engine } from "./engine";
 
 // The event layer: short plucks scheduled ahead of time, whose rate, register
 // and decay follow the blended timbre. The pad alone morphs but never moves;
@@ -10,7 +10,7 @@ import type { Engine } from "./engine";
  * how "there is no way to play it wrong" survives contact with random pitch
  * selection --- a scale with no tritone cannot produce a sour interval. */
 const SCALE = [0, 3, 5, 7, 10] as const;
-const OCTAVES = [0, 12, 24] as const;
+const OCTAVES = [0, 12] as const;
 
 /** Seconds between scheduler ticks, and how far ahead each tick schedules. */
 const TICK_MS = 25;
@@ -18,7 +18,6 @@ const SCHEDULE_AHEAD = 0.12;
 
 const INTERVAL_RANGE = { min: 0.11, max: 2.4 } as const;
 const DECAY_RANGE = { min: 0.18, max: 2.2 } as const;
-const ROOT_RANGE = { min: 46, max: 233 } as const;
 const MAX_JITTER = 0.55;
 
 /**
@@ -50,9 +49,7 @@ export function eventFrequency(register: number, pick: number): number {
   const octave =
     OCTAVES[Math.floor(pick * SCALE.length * OCTAVES.length) % OCTAVES.length] ??
     0;
-  // Plucks sit an octave above the drone so they read as a separate voice
-  // rather than thickening the pad.
-  return root * 2 ** ((degree + octave + 12) / 12);
+  return root * 2 ** ((degree + octave) / 12);
 }
 
 export class EventLayer {

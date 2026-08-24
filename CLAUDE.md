@@ -191,6 +191,20 @@ rediscovering them.
   something finite instead. This is why `clamp01` treats `NaN` as 0 and why
   the weighting and blending functions have explicit fallbacks — those tests
   are guarding a real crash, not a hypothetical.
+- **If an axis has nothing that removes a band, that band is a constant.**
+  The pad first shipped with only a lowpass, so no setting of any timbre axis
+  could change the low end and every prompt droned identically underneath.
+  Sweeping a filter is not the same as *shaping a spectrum*: for a quality to
+  vary across the field, something in the graph has to be able to take it away.
+- **Distortion flattens differences between sources.** A waveshaper imposes
+  its own harmonic signature on whatever it is fed, so running every voice
+  through one at all times makes every prompt converge on the same character.
+  Crossfade a clean path against the shaped one instead of driving everything
+  through it.
+- **Brightness is a ratio against the fundamental, not a frequency.** A 100Hz
+  tone cut at 2kHz is bright; a 1kHz tone cut at 2kHz is dull. Tie filter
+  cutoffs to the root so an axis means the same thing across the register ---
+  and so the filter can never fall below the fundamental and silence the voice.
 - **Astro needs `base` set explicitly** (`astro.config.mjs`), and Astro 7's
   `astro dev` daemonises: the CLI returns immediately and the server keeps
   running. Use `astro dev status` / `logs` / `stop`. The dev URL includes the
