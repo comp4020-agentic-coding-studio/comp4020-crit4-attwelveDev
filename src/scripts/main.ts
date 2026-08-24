@@ -1,9 +1,15 @@
 import { CONSTELLATION } from "../data/constellation";
 import { Engine } from "../lib/engine";
 import { EventLayer } from "../lib/events";
-import { clamp01 } from "../lib/mapping";
+import { applyEnergy } from "../lib/gesture";
+import { clamp01, mapLinear } from "../lib/mapping";
 import { blendTimbres, type Timbre } from "../lib/timbre";
-import { DEFAULT_FOCUS, gaussianWeights, type Point } from "../lib/weighting";
+import {
+  DEFAULT_FOCUS,
+  FOCUS_RANGE,
+  gaussianWeights,
+  type Point,
+} from "../lib/weighting";
 
 // Wiring: DOM events in, a position out, the field blended, the engine driven.
 // Everything with logic in it lives in lib/ so it can be tested without a
@@ -59,6 +65,10 @@ export function start(): void {
   let projected: Timbre[] | null = null;
   let loading = false;
   let tracker: import("../lib/hands").HandTracker | null = null;
+  /** How tightly the blend selects. Fixed unless a hand is steering it. */
+  let focus = DEFAULT_FOCUS;
+  /** How emphatic the hand's movement is. Always 0 without a hand. */
+  let energy = 0;
 
   function timbres(): readonly Timbre[] {
     return voicing === "projected" && projected ? projected : AUTHORED;
@@ -93,8 +103,11 @@ export function start(): void {
 
   function moveTo(next: Point): void {
     position = { x: clamp01(next.x), y: clamp01(next.y) };
-    const weights = gaussianWeights(position, POSITIONS, DEFAULT_FOCUS);
-    const timbre = blendTimbres(timbres(), weights);
+    const weights = gaussianWeights(position, POSITIONS, focus);
+    // The field says what this place sounds like; gestural energy says how
+    // agitated it is here. Split along the line the projection experiment
+    // found --- see docs/semantic-projection.md.
+    const timbre = applyEnergy(blendTimbres(timbres(), weights), energy);
     engine.setTimbre(timbre);
     events.setTimbre(timbre);
     render(weights);
@@ -224,9 +237,13 @@ export function start(): void {
         video: mirror,
         // The hand drives the same travelling point the pointer does, so
         // everything downstream is unchanged and the two inputs are
-        // interchangeable rather than parallel code paths.
-        onPosition: (point) => {
+        // interchangeable rather than parallel code paths. Openness and
+        // energy are the two things a pointer cannot express.
+        onReading: ({ point, openness, energy: gestural }) => {
           void begin();
+          // Spread to blur across many prompts, close to pick one out.
+          focus = mapLinear(openness, FOCUS_RANGE.min, FOCUS_RANGE.max);
+          energy = gestural;
           moveTo(point);
         },
         onState: (state) => {

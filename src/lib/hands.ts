@@ -1,4 +1,5 @@
 import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
+import { EnergyFollower, handOpenness } from "./gesture";
 import { clamp01 } from "./mapping";
 import type { Point } from "./weighting";
 
@@ -45,11 +46,28 @@ const FRAME_INSET = 0.18;
 
 export type HandState = "idle" | "loading" | "tracking" | "denied" | "failed";
 
+/** Everything one hand expresses, per frame. */
+export interface HandReading {
+  /** Where in the field the hand is pointing. */
+  point: Point;
+  /** 0 fist, 1 spread. Drives how tightly the blend selects. */
+  openness: number;
+  /** 0 still or gliding, 1 emphatic. Drives the temporal axes. */
+  energy: number;
+}
+
 export interface HandTrackerOptions {
   video: HTMLVideoElement;
-  onPosition: (point: Point) => void;
+  onReading: (reading: HandReading) => void;
   onState: (state: HandState) => void;
 }
+
+/**
+ * Openness is smoothed harder than position. Hand shape changes incidentally
+ * during a fast move --- fingers trail and splay --- and without heavier
+ * smoothing that crosstalk reads as the focus lurching every time you travel.
+ */
+const OPENNESS_SMOOTHING = 0.1;
 
 function expand(value: number): number {
   return clamp01((value - FRAME_INSET) / (1 - 2 * FRAME_INSET));
@@ -83,7 +101,10 @@ export class HandTracker {
   #stream: MediaStream | null = null;
   #frame: number | null = null;
   #smoothed: Point | null = null;
+  #openness: number | null = null;
   #lastVideoTime = -1;
+  #lastSample = 0;
+  readonly #energy = new EnergyFollower();
 
   constructor(options: HandTrackerOptions) {
     this.#options = options;
@@ -145,13 +166,15 @@ export class HandTracker {
     this.#stream = null;
     this.#options.video.srcObject = null;
     this.#smoothed = null;
+    this.#openness = null;
     this.#lastVideoTime = -1;
+    this.#energy.reset();
     this.#options.onState("idle");
   }
 
   #loop = (): void => {
     this.#frame = requestAnimationFrame(this.#loop);
-    const { video, onPosition } = this.#options;
+    const { video, onReading } = this.#options;
     if (!this.#landmarker || video.readyState < 2) return;
 
     // detectForVideo throws if given the same timestamp twice, and the camera
@@ -159,14 +182,18 @@ export class HandTracker {
     if (video.currentTime === this.#lastVideoTime) return;
     this.#lastVideoTime = video.currentTime;
 
-    const result = this.#landmarker.detectForVideo(video, performance.now());
-    const palm = result.landmarks?.[0]?.[PALM_LANDMARK];
-    // No hand in frame: hold the last position rather than snapping the sound
+    const now = performance.now();
+    const result = this.#landmarker.detectForVideo(video, now);
+    const landmarks = result.landmarks?.[0];
+    const palm = landmarks?.[PALM_LANDMARK];
+    // No hand in frame: hold the last reading rather than snapping the sound
     // to a corner. A hand leaving the frame should sound like a held note.
-    if (!palm) return;
+    if (!landmarks || !palm) {
+      this.#lastSample = now;
+      return;
+    }
 
     const target = fieldPointFromLandmark(palm);
-
     this.#smoothed = this.#smoothed
       ? {
           x: this.#smoothed.x + (target.x - this.#smoothed.x) * SMOOTHING,
@@ -174,6 +201,19 @@ export class HandTracker {
         }
       : target;
 
-    onPosition(this.#smoothed);
+    const openness = handOpenness(landmarks);
+    this.#openness =
+      this.#openness === null
+        ? openness
+        : this.#openness + (openness - this.#openness) * OPENNESS_SMOOTHING;
+
+    // Energy is measured on the smoothed position, not the raw landmark:
+    // landmark jitter is itself high-frequency, and feeding it to a
+    // jerk detector would read every still hand as emphatic.
+    const dt = (now - this.#lastSample) / 1000;
+    this.#lastSample = now;
+    const energy = this.#energy.push(this.#smoothed, dt);
+
+    onReading({ point: this.#smoothed, openness: this.#openness, energy });
   };
 }
