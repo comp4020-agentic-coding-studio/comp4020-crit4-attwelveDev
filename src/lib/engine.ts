@@ -83,7 +83,22 @@ const GLIDE_SECONDS = 0.07;
 const FADE_IN_SECONDS = 1.4;
 const MASTER_LEVEL = 0.44;
 
-const REVERB_SECONDS = 3.4;
+const REVERB_SECONDS = 2.2;
+
+/** Silence before the tail starts. Separating the reverb from the sound that
+ * caused it is most of what makes a wet signal stay legible. */
+const PRE_DELAY_SECONDS = 0.018;
+
+/** One-pole coefficients for the impulse's damping, early to late. Lower is
+ * darker, so the tail loses its top as it decays. */
+const IR_DAMPING = { start: 0.34, end: 0.035 } as const;
+
+/**
+ * `distant` never reaches fully wet. A signal with no dry component left has
+ * no transients and no definition --- and with the reverb carrying the sound,
+ * whatever texture the impulse has becomes the texture of the prompt.
+ */
+const MAX_WET = 0.82;
 
 interface Graph {
   ctx: AudioContext;
@@ -128,14 +143,36 @@ function softClipCurve(samples = 2048): Float32Array<ArrayBuffer> {
  * too, which is the right answer rather than an inconvenient one.
  */
 function makeImpulse(ctx: AudioContext, seconds: number): AudioBuffer {
-  const length = Math.max(1, Math.floor(ctx.sampleRate * seconds));
-  const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+  const rate = ctx.sampleRate;
+  const pre = Math.max(1, Math.floor(rate * PRE_DELAY_SECONDS));
+  const tail = Math.max(1, Math.floor(rate * seconds));
+  const impulse = ctx.createBuffer(2, pre + tail, rate);
+
   for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
     const samples = impulse.getChannelData(channel);
-    for (let i = 0; i < length; i += 1) {
-      // Exponential decay over uniform noise. The early samples carry the
-      // density that reads as a room; the tail is what reads as distance.
-      samples[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 2.6;
+    // One-pole lowpass whose cutoff falls as the tail decays. Undamped white
+    // noise is the whole problem: convolving with it smears every partial into
+    // a band of noise around itself, which is a hiss, not a room. Real spaces
+    // absorb high frequencies far faster than low ones, and that progressive
+    // damping is what makes a tail read as air rather than static.
+    let lowpassed = 0;
+    let peak = 0;
+
+    for (let i = 0; i < tail; i += 1) {
+      const t = i / tail;
+      const coeff = IR_DAMPING.start - (IR_DAMPING.start - IR_DAMPING.end) * t;
+      lowpassed += coeff * (Math.random() * 2 - 1 - lowpassed);
+      const value = lowpassed * (1 - t) ** 2.2;
+      samples[pre + i] = value;
+      peak = Math.max(peak, Math.abs(value));
+    }
+
+    // The damping costs most of the amplitude, so normalise back to a known
+    // level rather than leaving wet gain to compensate for a filter constant.
+    if (peak > 0) {
+      for (let i = pre; i < samples.length; i += 1) {
+        samples[i] = (samples[i] ?? 0) / peak;
+      }
     }
   }
   return impulse;
@@ -371,7 +408,8 @@ export class Engine {
 
     // Equal-power again: a linear pair dips in level through the middle, which
     // reads as the instrument getting quieter halfway to "distant".
-    to(dry.gain, Math.cos((t.distant * Math.PI) / 2));
-    to(wet.gain, Math.sin((t.distant * Math.PI) / 2));
+    const wetness = t.distant * MAX_WET;
+    to(dry.gain, Math.cos((wetness * Math.PI) / 2));
+    to(wet.gain, Math.sin((wetness * Math.PI) / 2));
   }
 }
