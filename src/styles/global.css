@@ -78,6 +78,60 @@ main {
   touch-action: none;
 }
 
+/* A prompt brightens with how much of it you are currently hearing, so the
+   field shows you the blend rather than only your position in it. --share is
+   set per element from the normalised weights. */
+.prompt {
+  --share: 0;
+
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+
+  /* Centred horizontally on the point, but hanging below it: the travelling
+     cursor lands exactly on the point, and text centred there would sit under
+     the cursor and be unreadable at precisely the moment it matters most. */
+  translate: -50% 0;
+  font-size: clamp(0.8125rem, 1.5vw, 1rem);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.prompt-dot {
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 50%;
+
+  /* Sits on the point itself, which is above the label's flow position. */
+  margin-top: -0.15rem;
+  background: color-mix(
+    in srgb,
+    var(--glow) calc(30% + var(--share) * 70%),
+    var(--ink-dim)
+  );
+  opacity: calc(0.45 + var(--share) * 0.55);
+  transition: opacity 220ms ease-out;
+}
+
+.prompt-text {
+  color: color-mix(
+    in srgb,
+    var(--ink) calc(30% + var(--share) * 70%),
+    var(--ink-dim)
+  );
+
+  /* A readable floor: an unlit prompt is still an invitation to walk toward
+     it, so it can't fade to the point where a stranger doesn't see the word. */
+  opacity: calc(0.55 + var(--share) * 0.45);
+  text-shadow: 0 0 calc(var(--share) * 1.6rem)
+    color-mix(in srgb, var(--glow) calc(var(--share) * 70%), transparent);
+  transition:
+    opacity 220ms ease-out,
+    color 220ms ease-out;
+}
+
 .invitation {
   position: absolute;
   inset: 0;

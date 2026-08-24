@@ -171,6 +171,31 @@ means building legibly is part of building well.
 You don't need a name, a student number, or any identity file in the repo: we
 know whose repo it is. Spend the effort on the work.
 
+## Facts about this stack that are easy to get wrong
+
+Things that have already cost time here. Add to this list rather than
+rediscovering them.
+
+- **TypeScript 6 makes the typed arrays generic over their backing buffer.**
+  A bare `Float32Array` widens to `Float32Array<ArrayBufferLike>`, which
+  includes `SharedArrayBuffer` and so does *not* satisfy Web Audio APIs that
+  want `Float32Array<ArrayBuffer>` — `WaveShaperNode.curve` is the one that
+  bit. Annotate the return type explicitly.
+- **`setTargetAtTime`, never `.value =`, for anything a pointer drives.**
+  Assigning an `AudioParam` on every `pointermove` steps it at frame rate,
+  which is audible as zipper noise on a filter. Its third argument is a time
+  constant, not a duration: the parameter covers ~95% of the distance in three
+  times that value, and zero is invalid.
+- **A `NaN` reaching an `AudioParam` throws and takes the voice with it.**
+  Every pure function feeding the audio graph absorbs `NaN` and returns
+  something finite instead. This is why `clamp01` treats `NaN` as 0 and why
+  the weighting and blending functions have explicit fallbacks — those tests
+  are guarding a real crash, not a hypothetical.
+- **Astro needs `base` set explicitly** (`astro.config.mjs`), and Astro 7's
+  `astro dev` daemonises: the CLI returns immediately and the server keeps
+  running. Use `astro dev status` / `logs` / `stop`. The dev URL includes the
+  base path — the bare root 404s.
+
 ## This file is yours
 
 This CLAUDE.md is a starting point, not a fixed rulebook. As you learn what your

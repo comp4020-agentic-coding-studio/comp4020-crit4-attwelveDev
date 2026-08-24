@@ -1,4 +1,5 @@
 ---
+import { CONSTELLATION } from "../data/constellation";
 import "../styles/global.css";
 ---
 
@@ -30,6 +31,19 @@ import "../styles/global.css";
       <h1>Field</h1>
 
       <div class="field" data-testid="field">
+        {
+          CONSTELLATION.map((prompt) => (
+            <span
+              class="prompt"
+              data-prompt
+              style={`left: ${prompt.at.x * 100}%; top: ${(1 - prompt.at.y) * 100}%`}
+            >
+              <span class="prompt-dot" aria-hidden="true" />
+              <span class="prompt-text">{prompt.text}</span>
+            </span>
+          ))
+        }
+
         <p class="invitation" data-testid="invitation">
           Move your mouse. Or press an arrow key.
         </p>
