@@ -26,14 +26,23 @@ function files(dir: string = DIST): string[] {
 }
 
 const shipped = files();
-const scripts = shipped
-  .filter((path) => path.endsWith(".js"))
-  .map((path) => readFileSync(path, "utf8"))
-  .join("\n");
 
 const pages = shipped
   .filter((path) => path.endsWith(".html"))
   .map((path) => new JSDOM(readFileSync(path, "utf8")).window.document);
+
+// All the JavaScript that ships, however it ships. A bundler is free to emit
+// a module as a separate file or inline it into the page, so asserting against
+// only one of those makes the check a claim about the build tool rather than
+// about the site.
+const scripts = [
+  ...shipped
+    .filter((path) => path.endsWith(".js"))
+    .map((path) => readFileSync(path, "utf8")),
+  ...pages.flatMap((doc) =>
+    [...doc.querySelectorAll("script")].map((tag) => tag.textContent ?? ""),
+  ),
+].join("\n");
 
 describe("the browser is the instrument, not a tape deck", () => {
   it("ships no pre-recorded audio files", () => {
