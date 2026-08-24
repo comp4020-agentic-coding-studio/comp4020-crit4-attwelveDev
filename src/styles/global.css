@@ -401,11 +401,18 @@ body[data-hands="tracking"] .mirror {
    a separate legend --- see the comment above the hands button markup. */
 .key {
   display: inline-block;
-  padding: 0.05em 0.4em;
+  padding: 0.15em 0.4em;
   border: 1px solid color-mix(in srgb, var(--ink-dim) 55%, transparent);
   border-radius: 0.3rem;
   font-family: inherit;
   font-size: 0.9em;
+
+  /* Overrides the inherited body line-height of 1.5. That left the box
+     ~18px tall with only ~1px of padding compensating, so the glyph sat
+     wherever the inflated line-box happened to place it rather than centred
+     in the visible border --- tight line-height plus real padding is what
+     actually centres it. */
+  line-height: 1;
 }
 
 /* Reserve width only while the text is actually changing --- the download
