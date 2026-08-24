@@ -56,6 +56,9 @@ export function start(): void {
   if (!field || !cursor) return;
 
   const marks = [...field.querySelectorAll<HTMLElement>("[data-prompt]")];
+  // Rendered from the same CONSTELLATION array as marks, in the same order,
+  // so index i here is prompt i without needing to look anything up.
+  const lines = [...field.querySelectorAll<SVGLineElement>("[data-line]")];
   const engine = new Engine();
   const events = new EventLayer(engine);
 
@@ -106,6 +109,18 @@ export function start(): void {
     marks.forEach((mark, index) => {
       const share = (weights[index] ?? 0) / loudest;
       mark.style.setProperty("--share", share.toFixed(3));
+    });
+
+    // The constellation lines are a second rendering of the same weights,
+    // not a decoration invented separately --- a line's brightness is always
+    // exactly what its prompt's label brightness is.
+    const cx = position.x * 100;
+    const cy = (1 - position.y) * 100;
+    lines.forEach((line, index) => {
+      line.setAttribute("x1", cx.toFixed(2));
+      line.setAttribute("y1", cy.toFixed(2));
+      const share = (weights[index] ?? 0) / loudest;
+      line.style.setProperty("--share", share.toFixed(3));
     });
   }
 

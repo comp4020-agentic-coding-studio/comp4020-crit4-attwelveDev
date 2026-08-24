@@ -101,6 +101,62 @@ main {
   touch-action: none;
 }
 
+/* Background scatter, purely decorative --- fills the void so the ground
+   reads as a night sky rather than emptiness. Sits behind everything else in
+   the field by virtue of being first in source order. */
+.starfield {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.star {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--ink-dim);
+  opacity: var(--peak, 0.6);
+  animation: star-twinkle var(--duration, 5s) ease-in-out var(--delay, 0s)
+    infinite;
+}
+
+@keyframes star-twinkle {
+  0%,
+  100% {
+    opacity: calc(var(--peak, 0.6) * 0.22);
+  }
+
+  50% {
+    opacity: var(--peak, 0.6);
+  }
+}
+
+/* One line per prompt, from the travelling point out to it. Opacity is set
+   per line from --share in exactly the pattern .prompt-text uses, so the two
+   are always in agreement --- a line's brightness never says something its
+   prompt's label doesn't already say. */
+.constellation-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 900ms ease;
+}
+
+body[data-playing="true"] .constellation-lines {
+  opacity: 1;
+}
+
+.constellation-lines line {
+  --share: 0;
+
+  stroke: var(--glow);
+  stroke-width: 1;
+  stroke-linecap: round;
+  opacity: calc(0.04 + var(--share) * 0.46);
+  transition: opacity 220ms ease-out;
+}
+
 /* A prompt brightens with how much of it you are currently hearing, so the
    field shows you the blend rather than only your position in it. --share is
    set per element from the normalised weights. */
@@ -411,5 +467,10 @@ body[data-playing="true"] .cursor {
   .invitation,
   .cursor {
     transition-duration: 1ms;
+  }
+
+  .star {
+    animation: none;
+    opacity: calc(var(--peak, 0.6) * 0.5);
   }
 }

@@ -1,6 +1,20 @@
 ---
 import { CONSTELLATION } from "../data/constellation";
 import "../styles/global.css";
+
+// Background scatter of stars, purely decorative. Generated once at build
+// time rather than by client JS: a static site doesn't need a script to draw
+// something that never has to respond to anything, and it means the sky is
+// there the instant the HTML parses, before any script has run.
+const STAR_COUNT = 110;
+const stars = Array.from({ length: STAR_COUNT }, () => ({
+  x: Math.random() * 100,
+  y: Math.random() * 100,
+  size: 0.6 + Math.random() * 1.6,
+  duration: 3 + Math.random() * 6,
+  delay: -Math.random() * 8,
+  peak: 0.3 + Math.random() * 0.7,
+}));
 ---
 
 <!doctype html>
@@ -34,6 +48,47 @@ import "../styles/global.css";
       <h1>Field</h1>
 
       <div class="field" data-testid="field">
+        <div class="starfield" aria-hidden="true">
+          {
+            stars.map((star) => (
+              <span
+                class="star"
+                style={`left: ${star.x}%; top: ${star.y}%; width: ${star.size}px; height: ${star.size}px; --duration: ${star.duration}s; --delay: ${star.delay}s; --peak: ${star.peak};`}
+              />
+            ))
+          }
+        </div>
+
+        <!--
+          One line per prompt, from the travelling point to that prompt's
+          position. x1/y1 are updated every frame in main.ts; x2/y2 are fixed,
+          so only the constellation's centre moves, the way a real one would
+          look from a point drifting among fixed stars. Opacity is driven by
+          the same blend weight that brightens the prompt's own label, so the
+          lines are a second rendering of one number, not decoration invented
+          separately from what is actually sounding.
+        -->
+        <svg
+          class="constellation-lines"
+          data-testid="lines"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          {
+            CONSTELLATION.map((prompt, index) => (
+              <line
+                data-line={index}
+                x1="50"
+                y1="50"
+                x2={prompt.at.x * 100}
+                y2={(1 - prompt.at.y) * 100}
+                vector-effect="non-scaling-stroke"
+              />
+            ))
+          }
+        </svg>
+
         {
           CONSTELLATION.map((prompt) => (
             <span
