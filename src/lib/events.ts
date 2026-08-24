@@ -1,4 +1,4 @@
-import { ROOT_RANGE, type Engine } from "./engine";
+import { partialRatio, ROOT_RANGE, type Engine } from "./engine";
 import { mapExp, mapLinear } from "./mapping";
 import { neutralTimbre, type Timbre } from "./timbre";
 
@@ -19,6 +19,16 @@ const SCHEDULE_AHEAD = 0.12;
 const INTERVAL_RANGE = { min: 0.11, max: 2.4 } as const;
 const DECAY_RANGE = { min: 0.18, max: 2.2 } as const;
 const MAX_JITTER = 0.55;
+
+/** Peak of a single pluck. These are the voice that carries the field's
+ * character, so they sit above the pad rather than inside it. */
+const PLUCK_LEVEL = 0.62;
+
+/** Relative gains of a pluck's partials. Three is enough for a spectrum. */
+const PLUCK_PARTIALS = [1, 0.4, 0.18] as const;
+
+/** Each partial rings this fraction as long as the one below it. */
+const PLUCK_DECAY_TILT = 0.55;
 
 /**
  * Seconds between events. Inverted against `dense` --- dense means more events,
@@ -49,7 +59,11 @@ export function eventFrequency(register: number, pick: number): number {
   const octave =
     OCTAVES[Math.floor(pick * SCALE.length * OCTAVES.length) % OCTAVES.length] ??
     0;
-  return root * 2 ** ((degree + octave) / 12);
+  // An octave above the drone. Two sounds in the same critical band mask each
+  // other, and the pad sustains while a pluck is brief --- so without the
+  // separation the pad wins every time and the events are felt rather than
+  // heard.
+  return root * 2 ** ((degree + octave + 12) / 12);
 }
 
 export class EventLayer {
@@ -118,32 +132,46 @@ export class EventLayer {
     }
   }
 
+  /**
+   * One struck tone, built from the same partial series as the pad.
+   *
+   * A single oscillator per event left the plucks carrying almost none of the
+   * prompt's identity --- the pad held all of it, so the pad had to be loud,
+   * and a loud sustained layer masks everything. Giving each event its own
+   * spectrum moves the character into the layer that punctuates rather than
+   * the one that drones.
+   */
   #schedule(ctx: AudioContext, bus: AudioNode, at: number): void {
     const t = this.#timbre;
     const decay = eventDecay(t.dense);
+    const fundamental = eventFrequency(t.register, Math.random());
+    const nodes: AudioNode[] = [];
 
-    const osc = ctx.createOscillator();
-    // Warm fields pluck with a triangle, metallic ones with a square: the odd
-    // harmonics are what make the same envelope read as struck rather than
-    // blown.
-    osc.type = t.metallic > 0.5 ? "square" : "triangle";
-    osc.frequency.value = eventFrequency(t.register, Math.random());
+    PLUCK_PARTIALS.forEach((gain, index) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = fundamental * partialRatio(index, t.metallic);
 
-    const envelope = ctx.createGain();
-    envelope.gain.value = 0;
-    // A short ramp rather than an instant jump: setValueAtTime on a gain of 0
-    // produces a click at the discontinuity.
-    envelope.gain.setValueAtTime(0, at);
-    envelope.gain.linearRampToValueAtTime(0.22, at + 0.008);
-    envelope.gain.exponentialRampToValueAtTime(0.0001, at + decay);
+      const envelope = ctx.createGain();
+      // Upper partials decay faster than the fundamental, which is what makes
+      // a struck sound read as struck: the strike is bright, the ring is not.
+      const partialDecay = decay * PLUCK_DECAY_TILT ** index;
 
-    osc.connect(envelope).connect(bus);
-    osc.start(at);
-    osc.stop(at + decay + 0.05);
-    // Nodes are single-use; without this the graph grows without bound.
-    osc.addEventListener("ended", () => {
-      osc.disconnect();
-      envelope.disconnect();
+      envelope.gain.setValueAtTime(0, at);
+      // A short ramp rather than an instant jump: a step from 0 is a click at
+      // the discontinuity.
+      envelope.gain.linearRampToValueAtTime(PLUCK_LEVEL * gain, at + 0.006);
+      envelope.gain.exponentialRampToValueAtTime(0.0001, at + partialDecay);
+
+      osc.connect(envelope).connect(bus);
+      osc.start(at);
+      osc.stop(at + partialDecay + 0.05);
+      nodes.push(osc, envelope);
+
+      // Nodes are single-use; without this the graph grows without bound.
+      osc.addEventListener("ended", () => {
+        for (const node of nodes) node.disconnect();
+      });
     });
   }
 }

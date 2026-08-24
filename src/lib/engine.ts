@@ -19,6 +19,18 @@ import { neutralTimbre, type Timbre } from "./timbre";
  */
 const HARMONIC = [1, 2, 3, 4, 6] as const;
 const INHARMONIC = [1, 2.76, 5.4, 8.93, 13.34] as const;
+
+/**
+ * The ratio of partial `index` at a given `metallic`. Shared with the event
+ * layer so a pluck is built from the same spectrum as the pad --- otherwise
+ * the two layers disagree about what the prompt sounds like, and whichever is
+ * louder wins.
+ */
+export function partialRatio(index: number, metallic: number): number {
+  const harmonic = HARMONIC[index] ?? 1;
+  const inharmonic = INHARMONIC[index] ?? 1;
+  return harmonic + (inharmonic - harmonic) * metallic;
+}
 const PARTIAL_GAINS = [0.5, 0.26, 0.17, 0.11, 0.07] as const;
 const PARTIAL_DETUNE = [0, 4, -3, 5, -6] as const;
 
@@ -32,8 +44,23 @@ export const ROOT_RANGE = { min: 110, max: 587 } as const;
  * the field, and guarantees the filter never sits below the fundamental and
  * silences the voice.
  */
-const CUTOFF_RATIO = { min: 1.15, max: 17 } as const;
+/**
+ * The floor is well above 1: a cutoff sitting on the fundamental passes only
+ * the fundamental, and a single low sine is exactly what "a hum" means. Even
+ * the darkest prompt keeps a few harmonics so it reads as an instrument
+ * rather than a test tone.
+ */
+const CUTOFF_RATIO = { min: 2.6, max: 20 } as const;
 const CUTOFF_CEILING = 14_000;
+
+/**
+ * The pad is a bed, not the lead voice. It sustains, so the ear stops hearing
+ * it as information within a second or two while it goes on masking anything
+ * sharing its critical band --- which is how a drone can be simultaneously
+ * boring and overwhelming. It also thins as the field gets denser, to leave
+ * room for the events that carry the actual character.
+ */
+const PAD_LEVEL = { base: 0.13, denseCut: 0.06 } as const;
 
 /** Just under the fundamental: removes rumble and shaper DC without touching
  * the note. Because it tracks the root, low prompts keep their weight and high
@@ -41,14 +68,20 @@ const CUTOFF_CEILING = 14_000;
  * across the field instead of droning identically under everything. */
 const HIGHPASS_RATIO = 0.62;
 
-const DRIVE_RANGE = { min: 1, max: 11 } as const;
+const DRIVE_RANGE = { min: 1, max: 6 } as const;
 const DETUNE_SPREAD_RANGE = { min: 1, max: 4.4 } as const;
 const LFO_RATE_RANGE = { min: 0.05, max: 5.5 } as const;
-const LFO_DEPTH_RANGE = { min: 0, max: 1400 } as const;
+/**
+ * Modulation depth as a fraction of the cutoff, not an absolute number of
+ * hertz. A fixed +/-1400Hz swing is a gentle shimmer on a bright prompt and a
+ * violent warble on a dark one, where it drives the cutoff below the
+ * fundamental and back on every cycle.
+ */
+const LFO_DEPTH_RATIO = 0.38;
 
 const GLIDE_SECONDS = 0.07;
 const FADE_IN_SECONDS = 1.4;
-const MASTER_LEVEL = 0.34;
+const MASTER_LEVEL = 0.44;
 
 const REVERB_SECONDS = 3.4;
 
@@ -56,6 +89,7 @@ interface Graph {
   ctx: AudioContext;
   master: GainNode;
   voiceIn: GainNode;
+  padLevel: GainNode;
   clean: GainNode;
   drive: GainNode;
   makeup: GainNode;
@@ -138,11 +172,18 @@ export class Engine {
 
     const ctx = new AudioContext();
 
+    // A safety net, not a mix bus compressor. The first version sat at -10dB
+    // with 12:1 and a 3ms attack, which is a brick wall: it caught every pluck
+    // transient and squashed it back down to the pad's level, destroying the
+    // exact contrast that makes an event audible over a drone. Levels below
+    // are set so this rarely engages at all.
     const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -10;
-    limiter.ratio.value = 12;
-    limiter.attack.value = 0.003;
-    limiter.release.value = 0.2;
+    limiter.threshold.value = -6;
+    limiter.ratio.value = 6;
+    // Slow enough that a pluck's 8ms attack passes through before the gain
+    // reduction arrives.
+    limiter.attack.value = 0.015;
+    limiter.release.value = 0.3;
     limiter.connect(ctx.destination);
 
     const master = ctx.createGain();
@@ -204,6 +245,12 @@ export class Engine {
     voiceIn.connect(clean);
     voiceIn.connect(drive);
 
+    // The pad passes through its own level control on the way to the shared
+    // bus; the event layer connects to the bus directly. Without this the two
+    // are locked together and the sustained layer always wins.
+    const padLevel = ctx.createGain();
+    padLevel.connect(voiceIn);
+
     const oscillators = PARTIAL_GAINS.map((gain, index) => {
       const osc = ctx.createOscillator();
       osc.type = "sine";
@@ -212,7 +259,7 @@ export class Engine {
       const level = ctx.createGain();
       level.gain.value = gain;
 
-      osc.connect(level).connect(voiceIn);
+      osc.connect(level).connect(padLevel);
       osc.start();
       return osc;
     });
@@ -221,6 +268,7 @@ export class Engine {
       ctx,
       master,
       voiceIn,
+      padLevel,
       clean,
       drive,
       makeup,
@@ -266,6 +314,7 @@ export class Engine {
     if (!this.#graph) return;
     const {
       ctx,
+      padLevel,
       clean,
       drive,
       makeup,
@@ -296,21 +345,18 @@ export class Engine {
     );
 
     oscillators.forEach((osc, index) => {
-      const harmonic = HARMONIC[index] ?? 1;
-      const inharmonic = INHARMONIC[index] ?? 1;
-      const ratio = harmonic + (inharmonic - harmonic) * t.metallic;
-      to(osc.frequency, root * ratio);
+      to(osc.frequency, root * partialRatio(index, t.metallic));
       to(osc.detune, (PARTIAL_DETUNE[index] ?? 0) * spread);
     });
 
+    to(padLevel.gain, PAD_LEVEL.base - t.dense * PAD_LEVEL.denseCut);
+
     to(highpass.frequency, root * HIGHPASS_RATIO);
-    to(
-      lowpass.frequency,
-      Math.min(
-        CUTOFF_CEILING,
-        root * mapExp(t.bright, CUTOFF_RATIO.min, CUTOFF_RATIO.max),
-      ),
+    const cutoff = Math.min(
+      CUTOFF_CEILING,
+      root * mapExp(t.bright, CUTOFF_RATIO.min, CUTOFF_RATIO.max),
     );
+    to(lowpass.frequency, cutoff);
 
     // Equal-power crossfade between clean and shaped, so `rough` changes the
     // character without also changing how loud the instrument is. Makeup gain
@@ -321,7 +367,7 @@ export class Engine {
     to(clean.gain, Math.cos((t.rough * Math.PI) / 2));
 
     to(lfoRate.frequency, mapExp(t.restless, LFO_RATE_RANGE.min, LFO_RATE_RANGE.max));
-    to(lfoDepth.gain, mapLinear(t.restless, LFO_DEPTH_RANGE.min, LFO_DEPTH_RANGE.max));
+    to(lfoDepth.gain, cutoff * LFO_DEPTH_RATIO * t.restless);
 
     // Equal-power again: a linear pair dips in level through the middle, which
     // reads as the instrument getting quieter halfway to "distant".
