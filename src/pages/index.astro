@@ -191,21 +191,29 @@ const stars = Array.from({ length: STAR_COUNT }, () => ({
             >off</span
           >
         </button>
-
-        <button
-          class="control"
-          type="button"
-          data-testid="voicing"
-          aria-pressed="false"
-        >
-          <span class="control-label">voiced by</span>
-          <span
-            class="control-value"
-            data-testid="voicing-value"
-            aria-live="polite">authored</span
-          >
-        </button>
       </div>
+
+      <!--
+        Deliberately separate from .controls, and styled to look like a
+        research annotation rather than a performance dial. Switching how the
+        field is voiced is an A/B comparison you'd run once, in a lab sense --
+        not something a performer reaches for mid-piece the way moving through
+        the field or opening a hand is. Placing it beside the performance
+        controls claimed an equal footing it hadn't earned.
+      -->
+      <button
+        class="compare"
+        type="button"
+        data-testid="voicing"
+        aria-pressed="false"
+      >
+        <span class="compare-label">compare voicing —</span>
+        <span
+          class="compare-value"
+          data-testid="voicing-value"
+          aria-live="polite">authored</span
+        >
+      </button>
 
       <video
         class="mirror"

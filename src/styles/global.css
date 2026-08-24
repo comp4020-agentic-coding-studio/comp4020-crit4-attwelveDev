@@ -273,9 +273,8 @@ body[data-guide="true"] .guide {
   line-height: 1.35;
 }
 
-/* Bottom right, opposite the title and the course link, so the three pieces of
-   chrome sit in different corners and none of them lands under the cursor at
-   a position a player is likely to want. */
+/* Bottom right: the performance controls, things a player would actually
+   reach for while playing. */
 .controls {
   position: absolute;
   inset: auto var(--edge) var(--edge) auto;
@@ -284,6 +283,56 @@ body[data-guide="true"] .guide {
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: flex-end;
+}
+
+/* Bottom left, deliberately apart from .controls and styled as an annotation
+   rather than a dial. Switching voicing is a research A/B --- run once, to
+   compare, not something reached for mid-performance --- and it sat oddly
+   claiming equal footing with hands when it lived in the same row. */
+.compare {
+  position: absolute;
+  inset: auto auto var(--edge) var(--edge);
+  z-index: 2;
+  display: flex;
+  gap: 0.4em;
+  align-items: baseline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 200ms ease;
+}
+
+.compare:hover,
+.compare:focus-visible {
+  opacity: 1;
+}
+
+.compare:focus-visible {
+  outline: 2px solid var(--glow);
+  outline-offset: 3px;
+}
+
+.compare-label {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--ink-dim) 50%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+.compare-value {
+  color: var(--glow);
+}
+
+.compare[data-busy="true"] .compare-value {
+  /* Reserve width only while the download percentage is counting up ---
+     see the equivalent rule on .control-value. */
+  display: inline-block;
+  min-width: 9ch;
 }
 
 /* A small mirrored preview, so a player can see where their hand is relative
@@ -434,10 +483,8 @@ body[data-playing="true"] .cursor {
   opacity: 1;
 }
 
-/* Narrow screens. The controls and the course link both live along the bottom
-   edge and collide once there isn't room for them side by side, so the
-   controls lift above it. The guide stacks into a column at this width, which
-   makes it tall enough to swallow the field --- so it gets tighter too. */
+/* Narrow screens. The guide stacks into a column at this width, which makes
+   it tall enough to swallow the field, so it gets tighter here. */
 @media (width <= 40rem) {
   .controls {
     inset: auto var(--edge) calc(var(--edge) + 2rem) auto;
