@@ -233,16 +233,30 @@ body[data-playing="true"] .invitation {
 }
 
 .cursor {
+  --halo: 6rem;
+  --energy: 0;
+
   position: absolute;
   top: 50%;
   left: 50%;
   width: 1.25rem;
   height: 1.25rem;
   border-radius: 50%;
-  background: var(--glow);
+  background: color-mix(
+    in srgb,
+    #fff calc(var(--energy) * 70%),
+    var(--glow)
+  );
   translate: -50% -50%;
+
+  /* The dot itself swells on an emphatic gesture --- small, because the halo
+     is doing the loud part and two things scaling at once reads as a glitch. */
+  scale: calc(1 + var(--energy) * 0.55);
   opacity: 0;
-  transition: opacity 900ms ease;
+  transition:
+    opacity 900ms ease,
+    scale 90ms ease-out,
+    background 90ms ease-out;
 }
 
 /* The halo is a radial gradient rather than stacked box-shadows: two shadows
@@ -252,15 +266,26 @@ body[data-playing="true"] .invitation {
 .cursor::after {
   content: "";
   position: absolute;
-  inset: -6rem;
+
+  /* Sized from the live focus radius, so the glow is a true picture of how far
+     the blend reaches rather than a fixed decoration. */
+  inset: calc(-1 * var(--halo));
   border-radius: 50%;
   background: radial-gradient(
     circle closest-side,
-    color-mix(in srgb, var(--glow) 42%, transparent) 0%,
-    color-mix(in srgb, var(--glow) 16%, transparent) 26%,
-    color-mix(in srgb, var(--glow) 5%, transparent) 52%,
+    color-mix(in srgb, var(--glow) calc(42% + var(--energy) * 38%), transparent)
+      0%,
+    color-mix(in srgb, var(--glow) calc(16% + var(--energy) * 22%), transparent)
+      26%,
+    color-mix(in srgb, var(--glow) calc(5% + var(--energy) * 9%), transparent)
+      52%,
     transparent 78%
   );
+
+  /* Fast enough to feel like a response to the gesture, not a fade. */
+  transition:
+    inset 140ms ease-out,
+    background 90ms ease-out;
   pointer-events: none;
 }
 

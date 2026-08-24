@@ -1,5 +1,10 @@
 import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
-import { EnergyFollower, handOpenness } from "./gesture";
+import {
+  AdaptiveRange,
+  EnergyFollower,
+  handSpread,
+  SPREAD_SEED,
+} from "./gesture";
 import { clamp01 } from "./mapping";
 import type { Point } from "./weighting";
 
@@ -35,6 +40,17 @@ const PALM_LANDMARK = 9;
  * is audible as a constant warble. Low enough to still feel responsive.
  */
 const SMOOTHING = 0.28;
+
+/**
+ * Separate, much lighter smoothing for the signal the energy follower reads.
+ *
+ * The first version measured jerk on the display-smoothed position, which was
+ * self-defeating: exponential smoothing is a low-pass filter and jerk is the
+ * highest-frequency content in the signal, so the sharp gestures it exists to
+ * detect were being filtered out before it saw them. This removes landmark
+ * jitter while leaving transients intact.
+ */
+const ENERGY_SMOOTHING = 0.72;
 
 /**
  * The camera sees a smaller area than a hand comfortably reaches, so raw
@@ -102,6 +118,8 @@ export class HandTracker {
   #frame: number | null = null;
   #smoothed: Point | null = null;
   #openness: number | null = null;
+  #energyPoint: Point | null = null;
+  readonly #spreadRange = new AdaptiveRange(SPREAD_SEED.closed, SPREAD_SEED.open);
   #lastVideoTime = -1;
   #lastSample = 0;
   readonly #energy = new EnergyFollower();
@@ -167,6 +185,7 @@ export class HandTracker {
     this.#options.video.srcObject = null;
     this.#smoothed = null;
     this.#openness = null;
+    this.#energyPoint = null;
     this.#lastVideoTime = -1;
     this.#energy.reset();
     this.#options.onState("idle");
@@ -201,19 +220,37 @@ export class HandTracker {
         }
       : target;
 
-    const openness = handOpenness(landmarks);
-    this.#openness =
-      this.#openness === null
-        ? openness
-        : this.#openness + (openness - this.#openness) * OPENNESS_SMOOTHING;
+    const spread = handSpread(landmarks);
+    if (spread !== null) {
+      // Normalised against the range this hand is actually observed to cover,
+      // because how far a given person opens their fingers is not knowable in
+      // advance and a wrong guess makes the control feel dead.
+      const openness = this.#spreadRange.normalise(spread);
+      this.#openness =
+        this.#openness === null
+          ? openness
+          : this.#openness + (openness - this.#openness) * OPENNESS_SMOOTHING;
+    }
 
-    // Energy is measured on the smoothed position, not the raw landmark:
-    // landmark jitter is itself high-frequency, and feeding it to a
-    // jerk detector would read every still hand as emphatic.
+    // Energy reads a lightly-smoothed position of its own, not the heavily
+    // smoothed one driving the display --- see ENERGY_SMOOTHING.
+    this.#energyPoint = this.#energyPoint
+      ? {
+          x: this.#energyPoint.x + (target.x - this.#energyPoint.x) * ENERGY_SMOOTHING,
+          y: this.#energyPoint.y + (target.y - this.#energyPoint.y) * ENERGY_SMOOTHING,
+        }
+      : target;
+
     const dt = (now - this.#lastSample) / 1000;
     this.#lastSample = now;
-    const energy = this.#energy.push(this.#smoothed, dt);
+    const energy = this.#energy.push(this.#energyPoint, dt);
 
-    onReading({ point: this.#smoothed, openness: this.#openness, energy });
+    onReading({
+      point: this.#smoothed,
+      // Neutral until a measurable hand has been seen, so the focus starts
+      // mid-range rather than pinned to one extreme.
+      openness: this.#openness ?? 0.5,
+      energy,
+    });
   };
 }

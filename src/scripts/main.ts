@@ -91,6 +91,14 @@ export function start(): void {
     // sound rises as the point rises. Flip here, once, at the boundary.
     cursor!.style.top = `${(1 - position.y) * 100}%`;
 
+    // The halo is the focus radius drawn at true scale, not a decoration that
+    // happens to grow: two sigma of the Gaussian, in the field's own units,
+    // converted to pixels. Opening your hand widens the blend and the glow by
+    // exactly the same amount, so the picture cannot disagree with the sound.
+    const width = field!.getBoundingClientRect().width;
+    cursor!.style.setProperty("--halo", `${focus * 2 * width}px`);
+    cursor!.style.setProperty("--energy", energy.toFixed(3));
+
     // Each prompt brightens with how much of it you are hearing. Weights are
     // normalised, so the strongest is rarely near 1 --- scale against the
     // loudest so the field still reads when everything is blended.

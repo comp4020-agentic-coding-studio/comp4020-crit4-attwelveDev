@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { applyEnergy, EnergyFollower, handOpenness, type Landmark } from "./gesture";
+import {
+  AdaptiveRange,
+  applyEnergy,
+  EnergyFollower,
+  handSpread,
+  type Landmark,
+} from "./gesture";
 import { neutralTimbre, TIMBRE_AXES } from "./timbre";
 
 // A headless browser can never detect a hand, so everything gesture-related
@@ -22,43 +28,84 @@ function hand(spread: number): Landmark[] {
   return landmarks;
 }
 
-describe("handOpenness", () => {
-  it("reads a fist low and a spread hand high", () => {
-    expect(handOpenness(hand(0.9))).toBeLessThan(0.2);
-    expect(handOpenness(hand(2.2))).toBeGreaterThan(0.8);
-  });
-
-  it("increases monotonically with spread", () => {
+describe("handSpread", () => {
+  it("increases monotonically as the fingers open", () => {
     let previous = -1;
     for (let spread = 0.9; spread <= 2.2; spread += 0.1) {
-      const value = handOpenness(hand(spread));
-      expect(value).toBeGreaterThanOrEqual(previous);
-      previous = value;
+      const value = handSpread(hand(spread));
+      expect(value).not.toBeNull();
+      expect(value!).toBeGreaterThan(previous);
+      previous = value!;
     }
   });
 
-  // The reading is a ratio against palm width, so moving the whole hand nearer
-  // the camera must not read as opening it.
+  // A ratio against palm width, so moving the whole hand nearer the camera
+  // must not read as opening it.
   it("is invariant to hand scale", () => {
     const near = hand(1.6);
     const far = near.map(({ x, y }) => ({
       x: 0.5 + (x - 0.5) * 0.4,
       y: 0.5 + (y - 0.5) * 0.4,
     }));
-    expect(handOpenness(far)).toBeCloseTo(handOpenness(near), 5);
+    expect(handSpread(far)!).toBeCloseTo(handSpread(near)!, 5);
   });
 
-  it("stays in range and never emits NaN for degenerate input", () => {
-    for (const landmarks of [
-      [],
-      Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.5 })),
-      hand(0),
-      hand(80),
-    ]) {
-      const value = handOpenness(landmarks);
-      expect(Number.isFinite(value)).toBe(true);
-      expect(value).toBeGreaterThanOrEqual(0);
-      expect(value).toBeLessThanOrEqual(1);
+  // Null rather than a midpoint, so a caller can hold its last good reading
+  // instead of being handed a fabricated one.
+  it("returns null for a hand it cannot measure", () => {
+    expect(handSpread([])).toBeNull();
+    expect(
+      handSpread(Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.5 }))),
+    ).toBeNull();
+  });
+});
+
+describe("AdaptiveRange", () => {
+  // The reason this exists: a hardcoded openness range guessed wrong means the
+  // player only ever drives the middle of the output, and the control feels
+  // dead. That is exactly what happened with the first fixed range.
+  it("spans the full output once it has seen both extremes", () => {
+    const range = new AdaptiveRange(1.15, 1.75);
+    // Values outside the seed on both sides, which is what a real hand
+    // produces the first time it is fully closed and fully opened.
+    range.normalise(0.9);
+    range.normalise(2.0);
+    expect(range.normalise(0.9)).toBeCloseTo(0, 5);
+    expect(range.normalise(2.0)).toBeCloseTo(1, 5);
+    expect(range.normalise(1.45)).toBeCloseTo(0.5, 1);
+  });
+
+  it("widens to admit values outside its seed", () => {
+    const range = new AdaptiveRange(1.15, 1.75);
+    range.normalise(0.4);
+    range.normalise(3);
+    expect(range.low).toBeCloseTo(0.4);
+    expect(range.high).toBeCloseTo(3);
+  });
+
+  // Shrinking toward recent values would make a hand held still slowly drift
+  // to "fully open" --- the classic failure of adaptive normalisation.
+  it("never narrows once widened", () => {
+    const range = new AdaptiveRange(1, 2);
+    range.normalise(0.5);
+    range.normalise(2.5);
+    for (let i = 0; i < 200; i += 1) range.normalise(1.5);
+    expect(range.low).toBeCloseTo(0.5);
+    expect(range.high).toBeCloseTo(2.5);
+  });
+
+  it("sits at the midpoint until the span is meaningful", () => {
+    const range = new AdaptiveRange(1.5, 1.55);
+    expect(range.normalise(1.52)).toBeCloseTo(0.5);
+  });
+
+  it("stays in range and never emits NaN", () => {
+    const range = new AdaptiveRange(1.15, 1.75);
+    for (const value of [0, -5, 1e9, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const out = range.normalise(value);
+      expect(Number.isFinite(out)).toBe(true);
+      expect(out).toBeGreaterThanOrEqual(0);
+      expect(out).toBeLessThanOrEqual(1);
     }
   });
 });

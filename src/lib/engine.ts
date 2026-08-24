@@ -77,7 +77,7 @@ const LFO_RATE_RANGE = { min: 0.05, max: 5.5 } as const;
  * violent warble on a dark one, where it drives the cutoff below the
  * fundamental and back on every cycle.
  */
-const LFO_DEPTH_RATIO = 0.38;
+const LFO_DEPTH_RATIO = 0.62;
 
 const GLIDE_SECONDS = 0.07;
 const FADE_IN_SECONDS = 1.4;
