@@ -222,6 +222,33 @@ export function start(): void {
    * stranger can play. Pointer and keyboard keep working throughout, including
    * on every failure path --- a refused camera must cost nothing.
    */
+  /** How long the gesture guide stays up once tracking has actually begun. */
+  const GUIDE_LINGER_MS = 9000;
+  let guideTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Show the guide while the model downloads, then retire it shortly after
+   * tracking starts. It is an introduction, not a permanent legend --- and the
+   * download is dead time it can usefully occupy.
+   */
+  function showGuide(state: string): void {
+    if (guideTimer !== null) clearTimeout(guideTimer);
+    guideTimer = null;
+
+    if (state === "loading") {
+      document.body.dataset.guide = "true";
+      return;
+    }
+    if (state === "tracking") {
+      document.body.dataset.guide = "true";
+      guideTimer = setTimeout(() => {
+        delete document.body.dataset.guide;
+      }, GUIDE_LINGER_MS);
+      return;
+    }
+    delete document.body.dataset.guide;
+  }
+
   const HAND_LABELS: Record<string, string> = {
     idle: "off",
     loading: "starting",
@@ -260,6 +287,7 @@ export function start(): void {
           if (state !== "tracking" && state !== "loading") {
             handsButton.setAttribute("aria-pressed", "false");
           }
+          showGuide(state);
         },
       });
 
