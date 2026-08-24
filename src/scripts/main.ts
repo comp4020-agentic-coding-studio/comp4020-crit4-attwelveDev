@@ -64,8 +64,15 @@ export function start(): void {
     return voicing === "projected" && projected ? projected : AUTHORED;
   }
 
-  function setReadout(text: string): void {
+  /**
+   * `busy` reserves the readout's width while the text is changing on its own
+   * --- the download percentage counts up character by character, and a button
+   * that resizes on every tick is worse than one briefly too wide.
+   */
+  function setReadout(text: string, busy = false): void {
     if (readout) readout.textContent = text;
+    if (busy) toggle?.setAttribute("data-busy", "true");
+    else toggle?.removeAttribute("data-busy");
   }
 
   function render(weights: readonly number[]): void {
@@ -104,7 +111,7 @@ export function start(): void {
     if (projected) return true;
     if (loading) return false;
     loading = true;
-    setReadout("loading 0%");
+    setReadout("loading 0%", true);
 
     try {
       const [{ buildAnchors, projectToTimbre }, { embed, loadEmbedder }] =
@@ -114,10 +121,10 @@ export function start(): void {
         ]);
 
       await loadEmbedder((fraction) => {
-        setReadout(`loading ${Math.round(fraction * 100)}%`);
+        setReadout(`loading ${Math.round(fraction * 100)}%`, true);
       });
 
-      setReadout("projecting");
+      setReadout("projecting", true);
       const anchors = await buildAnchors();
       const voiced: Timbre[] = [];
       for (const prompt of CONSTELLATION) {

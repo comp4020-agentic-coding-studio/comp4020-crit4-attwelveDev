@@ -203,10 +203,16 @@ body[data-hands="tracking"] .mirror {
 }
 
 .control-value {
-  /* Fixed width so the label doesn't jump as the download counts up. */
-  min-width: 9ch;
   color: var(--glow);
   text-align: left;
+}
+
+/* Reserve width only while the text is actually changing --- the download
+   percentage counts up character by character, and a button that resizes on
+   every tick is worse than one that is briefly too wide. Applying it in every
+   state instead padded short labels like "on" out to nine characters. */
+.control[data-busy="true"] .control-value {
+  min-width: 9ch;
 }
 
 .invitation {
