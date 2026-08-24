@@ -103,7 +103,7 @@ const stars = Array.from({ length: STAR_COUNT }, () => ({
         }
 
         <p class="invitation" data-testid="invitation">
-          Move your mouse. Or press an arrow key.
+          Click to begin. Or press an arrow key.
         </p>
         <div class="cursor" data-testid="cursor" aria-hidden="true"></div>
       </div>
@@ -180,13 +180,21 @@ const stars = Array.from({ length: STAR_COUNT }, () => ({
       </aside>
 
       <div class="controls" id="controls">
+        <!--
+          The key hint is in the button itself, not a tooltip or a separate
+          legend: reaching across a field that is already tracking your hand
+          to click a small target in the corner is exactly the wrong ask once
+          hands are on, so the shortcut needs to be visible without hovering
+          or reading docs.
+        -->
         <button
           class="control"
           type="button"
           data-testid="hands"
           aria-pressed="false"
+          aria-keyshortcuts="h"
         >
-          <span class="control-label">hands</span>
+          <span class="control-label">hands <kbd class="key">H</kbd></span>
           <span class="control-value" data-testid="hands-value" aria-live="polite"
             >off</span
           >

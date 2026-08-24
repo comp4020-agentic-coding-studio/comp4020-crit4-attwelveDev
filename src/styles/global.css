@@ -397,6 +397,17 @@ body[data-hands="tracking"] .mirror {
   text-align: left;
 }
 
+/* The keyboard shortcut, shown in the button rather than left to a tooltip or
+   a separate legend --- see the comment above the hands button markup. */
+.key {
+  display: inline-block;
+  padding: 0.05em 0.4em;
+  border: 1px solid color-mix(in srgb, var(--ink-dim) 55%, transparent);
+  border-radius: 0.3rem;
+  font-family: inherit;
+  font-size: 0.9em;
+}
+
 /* Reserve width only while the text is actually changing --- the download
    percentage counts up character by character, and a button that resizes on
    every tick is worse than one that is briefly too wide. Applying it in every

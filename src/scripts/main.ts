@@ -272,50 +272,69 @@ export function start(): void {
     failed: "unavailable",
   };
 
+  /**
+   * Shared by the button click and the "h" keyboard shortcut. Once hands are
+   * tracking, the point is following the player's hand, not the pointer ---
+   * reaching across a field that is already responding to you, to click a
+   * small target in the corner, is exactly the wrong ask at exactly the
+   * moment you'd want to turn it off. The key works from anywhere.
+   */
+  async function toggleHands(): Promise<void> {
+    if (!handsButton || !mirror) return;
+
+    if (tracker?.tracking) {
+      tracker.stop();
+      handsButton.setAttribute("aria-pressed", "false");
+      return;
+    }
+
+    handsButton.setAttribute("aria-pressed", "true");
+    tracker ??= new (await import("../lib/hands")).HandTracker({
+      video: mirror,
+      // The hand drives the same travelling point the pointer does, so
+      // everything downstream is unchanged and the two inputs are
+      // interchangeable rather than parallel code paths. Openness and
+      // energy are the two things a pointer cannot express.
+      onReading: ({ point, openness, energy: gestural }) => {
+        void begin();
+        // Spread to blur across many prompts, close to pick one out.
+        focus = mapLinear(openness, FOCUS_RANGE.min, FOCUS_RANGE.max);
+        energy = gestural;
+        moveTo(point);
+      },
+      onState: (state) => {
+        document.body.dataset.hands = state;
+        if (handsReadout) handsReadout.textContent = HAND_LABELS[state] ?? state;
+        if (state !== "tracking" && state !== "loading") {
+          handsButton.setAttribute("aria-pressed", "false");
+        }
+        showGuide(state);
+      },
+    });
+
+    await tracker.start();
+  }
+
   handsButton?.addEventListener("click", () => {
-    void (async () => {
-      if (!mirror) return;
-
-      if (tracker?.tracking) {
-        tracker.stop();
-        handsButton.setAttribute("aria-pressed", "false");
-        return;
-      }
-
-      handsButton.setAttribute("aria-pressed", "true");
-      tracker ??= new (await import("../lib/hands")).HandTracker({
-        video: mirror,
-        // The hand drives the same travelling point the pointer does, so
-        // everything downstream is unchanged and the two inputs are
-        // interchangeable rather than parallel code paths. Openness and
-        // energy are the two things a pointer cannot express.
-        onReading: ({ point, openness, energy: gestural }) => {
-          void begin();
-          // Spread to blur across many prompts, close to pick one out.
-          focus = mapLinear(openness, FOCUS_RANGE.min, FOCUS_RANGE.max);
-          energy = gestural;
-          moveTo(point);
-        },
-        onState: (state) => {
-          document.body.dataset.hands = state;
-          if (handsReadout) handsReadout.textContent = HAND_LABELS[state] ?? state;
-          if (state !== "tracking" && state !== "loading") {
-            handsButton.setAttribute("aria-pressed", "false");
-          }
-          showGuide(state);
-        },
-      });
-
-      await tracker.start();
-    })();
+    void toggleHands();
   });
 
   window.addEventListener("keydown", (event) => {
     const vector = KEY_VECTORS[event.key];
-    if (!vector) return;
-    event.preventDefault();
-    void begin();
-    moveTo({ x: position.x + vector.x, y: position.y + vector.y });
+    if (vector) {
+      event.preventDefault();
+      void begin();
+      moveTo({ x: position.x + vector.x, y: position.y + vector.y });
+      return;
+    }
+
+    // No modifier check needed beyond this: "h" alone has no default browser
+    // action, and every other control on the page is a button, not a field
+    // that would want to receive the letter as text.
+    if (event.key.toLowerCase() === "h") {
+      event.preventDefault();
+      void toggleHands();
+    }
   });
 
   moveTo(position);
