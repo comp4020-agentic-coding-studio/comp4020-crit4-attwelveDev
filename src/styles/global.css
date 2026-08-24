@@ -132,6 +132,54 @@ main {
     color 220ms ease-out;
 }
 
+/* Bottom right, opposite the title and the course link, so the three pieces of
+   chrome sit in different corners and none of them lands under the cursor at
+   a position a player is likely to want. */
+.voicing {
+  position: absolute;
+  inset: auto var(--edge) var(--edge) auto;
+  z-index: 2;
+  display: flex;
+  gap: 0.5em;
+  align-items: baseline;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--ink-dim) 40%, transparent);
+  border-radius: 2rem;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 0.8125rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    color 200ms ease;
+}
+
+.voicing:hover,
+.voicing:focus-visible {
+  border-color: color-mix(in srgb, var(--glow) 60%, transparent);
+  color: var(--ink);
+}
+
+.voicing:focus-visible {
+  outline: 2px solid var(--glow);
+  outline-offset: 3px;
+}
+
+.voicing[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--glow) 70%, transparent);
+  color: var(--ink);
+}
+
+.voicing-value {
+  /* Fixed width so the label doesn't jump as the download counts up. */
+  min-width: 9ch;
+  color: var(--glow);
+  text-align: left;
+}
+
 .invitation {
   position: absolute;
   inset: 0;

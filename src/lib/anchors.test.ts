@@ -18,8 +18,8 @@ function unit(values: number[]): Float32Array {
 function syntheticAnchors(): AnchorVectors {
   const anchors: AnchorVectors = new Map();
   TIMBRE_AXES.forEach((axis, index) => {
-    const positive = new Array(DIMS).fill(0);
-    const negative = new Array(DIMS).fill(0);
+    const positive = Array.from({ length: DIMS }, () => 0);
+    const negative = Array.from({ length: DIMS }, () => 0);
     positive[index % DIMS] = 1;
     negative[index % DIMS] = -1;
     anchors.set(axis, [unit(positive), unit(negative)]);
@@ -51,14 +51,14 @@ describe("projectToTimbre", () => {
   });
 
   it("lands above centre when leaning toward the positive pole", () => {
-    const leaning = new Array(DIMS).fill(0);
+    const leaning = Array.from({ length: DIMS }, () => 0);
     leaning[0] = 1;
     const timbre = projectToTimbre(unit(leaning), anchors);
     expect(timbre.bright).toBeGreaterThan(0.9);
   });
 
   it("lands below centre when leaning toward the negative pole", () => {
-    const leaning = new Array(DIMS).fill(0);
+    const leaning = Array.from({ length: DIMS }, () => 0);
     leaning[0] = -1;
     const timbre = projectToTimbre(unit(leaning), anchors);
     expect(timbre.bright).toBeLessThan(0.1);
@@ -67,7 +67,7 @@ describe("projectToTimbre", () => {
   it("stays inside 0..1 for any input, however extreme", () => {
     const extremes = [
       unit([50, -50, 20, 0, 0, 0, 0, 0]),
-      Float32Array.from(new Array(DIMS).fill(0)),
+      Float32Array.from(Array.from({ length: DIMS }, () => 0)),
       unit([-1, -1, -1, -1, -1, -1, -1, -1]),
     ];
     for (const embedding of extremes) {

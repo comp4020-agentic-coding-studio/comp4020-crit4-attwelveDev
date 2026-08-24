@@ -12,9 +12,24 @@ const MODEL = "Xenova/all-MiniLM-L6-v2";
 
 let pending: Promise<FeatureExtractionPipeline> | null = null;
 
-/** Load the model, once. Concurrent callers share the same promise. */
-export function loadEmbedder(): Promise<FeatureExtractionPipeline> {
-  pending ??= pipeline("feature-extraction", MODEL, { dtype: "q8" });
+/**
+ * Load the model, once. Concurrent callers share the same promise.
+ *
+ * `onProgress` reports 0..1 across the download. It is worth threading through
+ * rather than showing a spinner: this is tens of megabytes, and a control that
+ * looks stuck for twenty seconds reads as broken.
+ */
+export function loadEmbedder(
+  onProgress?: (fraction: number) => void,
+): Promise<FeatureExtractionPipeline> {
+  pending ??= pipeline("feature-extraction", MODEL, {
+    dtype: "q8",
+    progress_callback: (event: { status?: string; progress?: number }) => {
+      if (event.status === "progress" && typeof event.progress === "number") {
+        onProgress?.(Math.min(1, Math.max(0, event.progress / 100)));
+      }
+    },
+  });
   return pending;
 }
 
