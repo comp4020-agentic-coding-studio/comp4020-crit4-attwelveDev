@@ -27,8 +27,21 @@ const PLUCK_LEVEL = 0.62;
 /** Relative gains of a pluck's partials. Three is enough for a spectrum. */
 const PLUCK_PARTIALS = [1, 0.4, 0.18] as const;
 
-/** Each partial rings this fraction as long as the one below it. */
-const PLUCK_DECAY_TILT = 0.55;
+/**
+ * Each partial rings this fraction as long as the one below it, and how much
+ * depends on `metallic`.
+ *
+ * This is most of what separates metal from wood, and it was missing: moving
+ * partial *ratios* alone measured as the second-weakest axis in the
+ * instrument. A struck bar sheds its high partials slowly and rings for
+ * seconds; a struck block sheds them almost immediately and thuds. Same
+ * spectrum at the attack, completely different object a moment later.
+ */
+const DECAY_TILT = { warm: 0.4, metallic: 0.94 } as const;
+
+function decayTilt(metallic: number): number {
+  return DECAY_TILT.warm + (DECAY_TILT.metallic - DECAY_TILT.warm) * metallic;
+}
 
 /**
  * Seconds between events. Inverted against `dense` --- dense means more events,
@@ -145,6 +158,7 @@ export class EventLayer {
     const t = this.#timbre;
     const decay = eventDecay(t.dense);
     const fundamental = eventFrequency(t.register, Math.random());
+    const tilt = decayTilt(t.metallic);
     const nodes: AudioNode[] = [];
 
     PLUCK_PARTIALS.forEach((gain, index) => {
@@ -155,7 +169,7 @@ export class EventLayer {
       const envelope = ctx.createGain();
       // Upper partials decay faster than the fundamental, which is what makes
       // a struck sound read as struck: the strike is bright, the ring is not.
-      const partialDecay = decay * PLUCK_DECAY_TILT ** index;
+      const partialDecay = decay * tilt ** index;
 
       envelope.gain.setValueAtTime(0, at);
       // A short ramp rather than an instant jump: a step from 0 is a click at

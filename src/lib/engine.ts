@@ -50,8 +50,8 @@ export const ROOT_RANGE = { min: 110, max: 587 } as const;
  * the darkest prompt keeps a few harmonics so it reads as an instrument
  * rather than a test tone.
  */
-const CUTOFF_RATIO = { min: 2.6, max: 20 } as const;
-const CUTOFF_CEILING = 14_000;
+const CUTOFF_RATIO = { min: 2.2, max: 48 } as const;
+const CUTOFF_CEILING = 15_000;
 
 /**
  * The pad is a bed, not the lead voice. It sustains, so the ear stops hearing
@@ -110,6 +110,7 @@ interface Graph {
   makeup: GainNode;
   highpass: BiquadFilterNode;
   lowpass: BiquadFilterNode;
+  lowpass2: BiquadFilterNode;
   dry: GainNode;
   wet: GainNode;
   lfoRate: OscillatorNode;
@@ -237,11 +238,21 @@ export class Engine {
     const wet = ctx.createGain();
     wet.connect(reverb).connect(master);
 
+    // Two cascaded lowpass stages rather than one. A single biquad rolls off
+    // at 12dB/octave, which measured as the weakest axis in the instrument ---
+    // a gentle tilt rather than a filter you notice. Cascading doubles the
+    // slope to 24dB/octave, which is what a synth filter normally is, and it
+    // is the difference between "slightly duller" and "closed".
+    const lowpass2 = ctx.createBiquadFilter();
+    lowpass2.type = "lowpass";
+    lowpass2.Q.value = 0.7;
+    lowpass2.connect(dry);
+    lowpass2.connect(wet);
+
     const lowpass = ctx.createBiquadFilter();
     lowpass.type = "lowpass";
     lowpass.Q.value = 1.1;
-    lowpass.connect(dry);
-    lowpass.connect(wet);
+    lowpass.connect(lowpass2);
 
     const highpass = ctx.createBiquadFilter();
     highpass.type = "highpass";
@@ -254,7 +265,9 @@ export class Engine {
     lfoRate.type = "sine";
     const lfoDepth = ctx.createGain();
     lfoDepth.gain.value = 0;
-    lfoRate.connect(lfoDepth).connect(lowpass.frequency);
+    lfoRate.connect(lfoDepth);
+    lfoDepth.connect(lowpass.frequency);
+    lfoDepth.connect(lowpass2.frequency);
     lfoRate.start();
 
     // Two parallel paths into the filters. `rough` crossfades between them, so
@@ -311,6 +324,7 @@ export class Engine {
       makeup,
       highpass,
       lowpass,
+      lowpass2,
       dry,
       wet,
       lfoRate,
@@ -357,6 +371,7 @@ export class Engine {
       makeup,
       highpass,
       lowpass,
+      lowpass2,
       dry,
       wet,
       lfoRate,
@@ -394,6 +409,7 @@ export class Engine {
       root * mapExp(t.bright, CUTOFF_RATIO.min, CUTOFF_RATIO.max),
     );
     to(lowpass.frequency, cutoff);
+    to(lowpass2.frequency, cutoff);
 
     // Equal-power crossfade between clean and shaped, so `rough` changes the
     // character without also changing how loud the instrument is. Makeup gain
