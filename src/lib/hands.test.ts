@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fieldPointFromLandmark } from "./hands";
+import { fieldPointFromLandmark, nearFrameEdge } from "./hands";
 
 // The coordinate mapping is the one part of hand tracking a headless browser
 // cannot exercise: Chrome's fake camera emits a test pattern, so no hand is
@@ -58,5 +58,23 @@ describe("fieldPointFromLandmark", () => {
       expect(point.x).toBeGreaterThan(previous);
       previous = point.x;
     }
+  });
+});
+
+describe("nearFrameEdge", () => {
+  it("is false in the middle of the frame", () => {
+    expect(nearFrameEdge({ x: 0.5, y: 0.5 })).toBe(false);
+  });
+
+  it("is true right at each edge", () => {
+    expect(nearFrameEdge({ x: 0.01, y: 0.5 })).toBe(true);
+    expect(nearFrameEdge({ x: 0.99, y: 0.5 })).toBe(true);
+    expect(nearFrameEdge({ x: 0.5, y: 0.01 })).toBe(true);
+    expect(nearFrameEdge({ x: 0.5, y: 0.99 })).toBe(true);
+  });
+
+  it("respects a custom margin", () => {
+    expect(nearFrameEdge({ x: 0.5, y: 0.5 }, 0.6)).toBe(true);
+    expect(nearFrameEdge({ x: 0.5, y: 0.5 }, 0.01)).toBe(false);
   });
 });

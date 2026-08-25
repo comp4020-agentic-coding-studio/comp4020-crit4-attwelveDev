@@ -7,6 +7,7 @@
   --ink-dim: #8b8681;
   --ground: #0b0b0d;
   --glow: #d9b3ff;
+  --warn: #ffb454;
   --edge: clamp(1rem, 3vw, 2rem);
 }
 
@@ -335,13 +336,23 @@ body[data-guide="true"] .guide {
   min-width: 9ch;
 }
 
-/* A small mirrored preview, so a player can see where their hand is relative
-   to the frame. Dim and out of the way: it is a sighting aid, not content. */
-.mirror {
+.mirror-frame {
   position: absolute;
   inset: var(--edge) var(--edge) auto auto;
   z-index: 2;
   width: clamp(7rem, 14vw, 11rem);
+  aspect-ratio: 4 / 3; /* match your camera stream's actual ratio */
+  overflow: hidden;
+  border-radius: 0.5rem; /* move here so overflow:hidden clips the video's corners too */
+}
+
+/* A small mirrored preview, so a player can see where their hand is relative
+   to the frame. Dim and out of the way: it is a sighting aid, not content. */
+.mirror {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   border: 1px solid color-mix(in srgb, var(--ink-dim) 35%, transparent);
   border-radius: 0.5rem;
 
@@ -355,6 +366,41 @@ body[data-guide="true"] .guide {
 
 body[data-hands="tracking"] .mirror {
   opacity: 0.42;
+}
+
+/* Sits directly on top of .mirror, same box, higher stacking order: the
+   warning is about what that preview currently shows, so it reads as a state
+   of the camera rather than a separate notice competing for a place on the
+   page. Hidden unless tracking is actually live and has something to flag. */
+.hand-warning {
+  position: absolute;
+  inset: 0;
+  margin: 0; /* <p> has a default 1em vertical margin, which shows up as
+                a gap on all sides since inset:0 + explicit (non-auto)
+                margin is honored rather than discarded */
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, transparent);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--ground) 75%, transparent);
+  color: var(--warn);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  text-wrap: balance;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+
+body[data-hands="tracking"][data-hand-warning="no-hand"] .hand-warning,
+body[data-hands="tracking"][data-hand-warning="near-edge"] .hand-warning {
+  opacity: 1;
 }
 
 .control {

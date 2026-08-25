@@ -223,12 +223,26 @@ const stars = Array.from({ length: STAR_COUNT }, () => ({
         >
       </button>
 
-      <video
-        class="mirror"
-        data-testid="mirror"
-        playsinline
-        muted
-        aria-hidden="true"></video>
+      <div class="mirror-frame">
+        <video
+          class="mirror"
+          data-testid="mirror"
+          playsinline
+          muted
+          aria-hidden="true"></video>
+
+        <!--
+          Overlays the mirror preview rather than living beside it: the warning
+          is about what the camera can currently see, so it belongs on the one
+          piece of chrome that shows the camera. aria-live carries it to anyone
+          not watching the corner of the screen when their hand drifts off.
+        -->
+        <p
+          class="hand-warning"
+          data-testid="hand-warning"
+          aria-live="assertive"
+        ></p>
+      </div>
     </main>
 
     <script>

@@ -60,7 +60,44 @@ const ENERGY_SMOOTHING = 0.72;
  */
 const FRAME_INSET = 0.18;
 
+/**
+ * How close a landmark can get to the camera's raw edge (0 or 1, before the
+ * inset expansion above) before it counts as "about to leave frame". Checked
+ * against the raw coordinate, not the expanded field position, because the
+ * field position already saturates at FRAME_INSET --- by the time it reads 1
+ * the hand could still be well inside the frame.
+ */
+const EDGE_MARGIN = 0.09;
+
+/**
+ * A single dropped frame is normal --- detection flickers even from a still,
+ * centred hand --- so "no hand" only fires after this much continuous silence,
+ * not the first missed frame.
+ */
+const NO_HAND_GRACE_MS = 350;
+
 export type HandState = "idle" | "loading" | "tracking" | "denied" | "failed";
+
+/** Nothing to flag, the hand is about to leave frame, or it already has. */
+export type HandWarning = "none" | "near-edge" | "no-hand";
+
+/**
+ * Whether a landmark is close enough to the camera's edge that the next
+ * movement could lose it. Exported for the same reason as
+ * fieldPointFromLandmark: it is coordinate arithmetic a headless browser's
+ * fake camera never exercises, so it is pinned directly instead.
+ */
+export function nearFrameEdge(
+  landmark: { x: number; y: number },
+  margin: number = EDGE_MARGIN,
+): boolean {
+  return (
+    landmark.x < margin ||
+    landmark.x > 1 - margin ||
+    landmark.y < margin ||
+    landmark.y > 1 - margin
+  );
+}
 
 /** Everything one hand expresses, per frame. */
 export interface HandReading {
@@ -76,6 +113,8 @@ export interface HandTrackerOptions {
   video: HTMLVideoElement;
   onReading: (reading: HandReading) => void;
   onState: (state: HandState) => void;
+  /** Fires only on change, so the caller can drive an aria-live region without debouncing it again. */
+  onWarning: (warning: HandWarning) => void;
 }
 
 /**
@@ -123,6 +162,8 @@ export class HandTracker {
   #lastVideoTime = -1;
   #lastSample = 0;
   readonly #energy = new EnergyFollower();
+  #warning: HandWarning = "none";
+  #lastHandSeen = 0;
 
   constructor(options: HandTrackerOptions) {
     this.#options = options;
@@ -130,6 +171,12 @@ export class HandTracker {
 
   get tracking(): boolean {
     return this.#frame !== null;
+  }
+
+  #setWarning(next: HandWarning): void {
+    if (next === this.#warning) return;
+    this.#warning = next;
+    this.#options.onWarning(next);
   }
 
   /**
@@ -167,6 +214,9 @@ export class HandTracker {
       await video.play();
 
       this.#options.onState("tracking");
+      // Grace period starts now, not at the first missed frame --- otherwise
+      // a hand that takes a moment to be recognised warns immediately.
+      this.#lastHandSeen = performance.now();
       this.#loop();
       return true;
     } catch (error) {
@@ -188,6 +238,7 @@ export class HandTracker {
     this.#energyPoint = null;
     this.#lastVideoTime = -1;
     this.#energy.reset();
+    this.#setWarning("none");
     this.#options.onState("idle");
   }
 
@@ -208,9 +259,14 @@ export class HandTracker {
     // No hand in frame: hold the last reading rather than snapping the sound
     // to a corner. A hand leaving the frame should sound like a held note.
     if (!landmarks || !palm) {
+      if (now - this.#lastHandSeen > NO_HAND_GRACE_MS) {
+        this.#setWarning("no-hand");
+      }
       this.#lastSample = now;
       return;
     }
+    this.#lastHandSeen = now;
+    this.#setWarning(nearFrameEdge(palm) ? "near-edge" : "none");
 
     const target = fieldPointFromLandmark(palm);
     this.#smoothed = this.#smoothed

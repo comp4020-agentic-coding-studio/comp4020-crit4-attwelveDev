@@ -53,6 +53,9 @@ export function start(): void {
   const mirror = document.querySelector<HTMLVideoElement>(
     '[data-testid="mirror"]',
   );
+  const handWarning = document.querySelector<HTMLElement>(
+    '[data-testid="hand-warning"]',
+  );
   if (!field || !cursor) return;
 
   const marks = [...field.querySelectorAll<HTMLElement>("[data-prompt]")];
@@ -272,6 +275,11 @@ export function start(): void {
     failed: "unavailable",
   };
 
+  const HAND_WARNING_LABELS: Record<string, string> = {
+    "no-hand": "no hand visible",
+    "near-edge": "hand near edge",
+  };
+
   /**
    * Shared by the button click and the "h" keyboard shortcut. Once hands are
    * tracking, the point is following the player's hand, not the pointer ---
@@ -285,6 +293,8 @@ export function start(): void {
     if (tracker?.tracking) {
       tracker.stop();
       handsButton.setAttribute("aria-pressed", "false");
+      delete document.body.dataset.handWarning;
+      if (handWarning) handWarning.textContent = "";
       return;
     }
 
@@ -307,8 +317,20 @@ export function start(): void {
         if (handsReadout) handsReadout.textContent = HAND_LABELS[state] ?? state;
         if (state !== "tracking" && state !== "loading") {
           handsButton.setAttribute("aria-pressed", "false");
+          delete document.body.dataset.handWarning;
+          if (handWarning) handWarning.textContent = "";
         }
         showGuide(state);
+      },
+      onWarning: (warning) => {
+        if (warning === "none") {
+          delete document.body.dataset.handWarning;
+        } else {
+          document.body.dataset.handWarning = warning;
+        }
+        if (handWarning) {
+          handWarning.textContent = HAND_WARNING_LABELS[warning] ?? "";
+        }
       },
     });
 
