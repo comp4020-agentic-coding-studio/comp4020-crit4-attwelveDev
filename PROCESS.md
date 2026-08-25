@@ -1,12 +1,5 @@
 # Process overview
 
-<!-- DRAFT SCAFFOLD — edit before shipping.
-
-     The citations, checks and technical facts below are accurate. What needs
-     your hand is the judgement: each moment should say why *you* made the call
-     you made. Where a bracketed note appears, that's a gap only you can fill.
-     Cut anything that doesn't match how the week actually felt. -->
-
 ## What I built
 
 **Field** is a browser instrument built as a probe for my honours thesis, in
@@ -84,11 +77,10 @@ needed
 Contrast after the fix: 3.5–5.0×.
 
 But the numbers never initiated a fix. Both audio problems were found by ear
-first, and measurement only told me *why*. A spectrum plot cannot tell you
-something is unpleasant to sit with.
-
-<!-- [Your line here: how did you decide when it sounded right? What were you
-     listening for that a number couldn't stand in for?] -->
+first, and measurement only told me *why*. I moved my cursor around the field to
+each of the prompts and listened for their distinct sound. And indeed, each prompt
+mapped to a sound with a distinct personality yet harmonious with the rest of the
+field that felt it echoed the text prompt surprisingly well.
 
 ## Where to look
 
@@ -97,5 +89,3 @@ something is unpleasant to sit with.
   [`ad47a73`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-attwelveDev/commit/ad47a73)
 - The build, plan through instrument:
   [`3c19be6...5522efa`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-attwelveDev/compare/3c19be6...5522efa)
-- `PLAN.md` records what was deliberately left out and why — hand tracking, a
-  real generative model, trajectory-as-score.
